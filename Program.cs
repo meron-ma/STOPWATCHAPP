@@ -1,27 +1,27 @@
-﻿using System;
+using System;
 using System.Threading;
 
 public class Stopwatch
 {
+    private TimeSpan timeElapsed;
+    private bool isRunning;
+    private Thread tickThread;
+
     public delegate void StopwatchEventHandler(string message);
-    
     public event StopwatchEventHandler OnStarted;
     public event StopwatchEventHandler OnStopped;
     public event StopwatchEventHandler OnReset;
 
-    private TimeSpan timeElapsed;
-    private bool isRunning;
-    private Thread timerThread;
-
     public TimeSpan TimeElapsed => timeElapsed;
+    public bool IsRunning => isRunning;
 
     public void Start()
     {
         if (!isRunning)
         {
             isRunning = true;
-            timerThread = new Thread(Tick);
-            timerThread.Start();
+            tickThread = new Thread(Tick);
+            tickThread.Start();
             OnStarted?.Invoke("Stopwatch Started!");
         }
     }
@@ -31,16 +31,16 @@ public class Stopwatch
         if (isRunning)
         {
             isRunning = false;
-            timerThread?.Join();
-            OnStopped?.Invoke("Stopwatch Stopped! Time Elapsed: " + timeElapsed);
+            
+            OnStopped?.Invoke($"Stopwatch Stopped! Time Elapsed: {timeElapsed}");
         }
     }
 
     public void Reset()
     {
-        isRunning = false;
+        Stop();
         timeElapsed = TimeSpan.Zero;
-        timerThread?.Join();
+       
         OnReset?.Invoke("Stopwatch Reset!");
     }
 
@@ -48,45 +48,59 @@ public class Stopwatch
     {
         while (isRunning)
         {
-            Thread.Sleep(1000);
-            timeElapsed = timeElapsed.Add(TimeSpan.FromSeconds(1));
-            Console.WriteLine("Time Elapsed: " + timeElapsed);
+            Thread.Sleep(1000); 
+            if (isRunning)  
+            {
+                timeElapsed = timeElapsed.Add(TimeSpan.FromSeconds(1));
+                Console.WriteLine($"Time Elapsed: {timeElapsed}");
+            }
+        }
+    }
+
+    public void StopThread()
+    {
+       
+        if (tickThread != null && tickThread.IsAlive)
+        {
+            tickThread.Abort();
+            tickThread = null;
         }
     }
 }
 
 class Program
 {
-    static void Main(string[] args)
+    static void Main()
     {
-        Stopwatch stopwatch = new Stopwatch();
-
+        var stopwatch = new Stopwatch();
+        
         // Subscribe to events
-        stopwatch.OnStarted += (message) => Console.WriteLine(message);
-        stopwatch.OnStopped += (message) => Console.WriteLine(message);
-        stopwatch.OnReset += (message) => Console.WriteLine(message);
+        stopwatch.OnStarted += message => Console.WriteLine(message);
+        stopwatch.OnStopped += message => Console.WriteLine(message);
+        stopwatch.OnReset += message => Console.WriteLine(message);
 
-        Console.WriteLine("Press 'S' to start, 'T' to stop, 'R' to reset, and 'Q' to quit.");
+        Console.WriteLine("Press S to start, T to stop, R to reset, Any key to exit.");
 
         while (true)
         {
             var key = Console.ReadKey(true).Key;
 
-            if (key == ConsoleKey.S)
+            switch (key)
             {
-                stopwatch.Start();
-            }
-            else if (key == ConsoleKey.T)
-            {
-                stopwatch.Stop();
-            }
-            else if (key == ConsoleKey.R)
-            {
-                stopwatch.Reset();
-            }
-            else if (key == ConsoleKey.Q)
-            {
-                break;
+                case ConsoleKey.S:
+                    stopwatch.Start();
+                    break;
+                case ConsoleKey.T:
+                    stopwatch.Stop();
+                    break;
+                case ConsoleKey.R:
+                    stopwatch.Reset();
+                    break;
+                
+                default:
+                   Console.WriteLine("Exiting...");
+                    stopwatch.StopThread(); 
+                    return; // Exit the application
             }
         }
     }
